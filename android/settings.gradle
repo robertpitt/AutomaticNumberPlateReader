@@ -1,2 +1,4 @@
-include ':app'
 rootProject.name='AutomaticNumberPlateReader'
+include ':app'
+  include ':opencv'
+  project(':opencv').projectDir = new File(opencvsdk + '/sdk')
