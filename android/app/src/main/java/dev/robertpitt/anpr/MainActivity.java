@@ -4,13 +4,20 @@ package dev.robertpitt.anpr;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
+
+import com.googlecode.tesseract.android.TessBaseAPI;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -22,16 +29,20 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
-import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
+
+import static dev.robertpitt.anpr.Utils.rotateBasedOnRect;
 
 public class MainActivity extends Activity implements CvCameraViewListener2 {
     /**
@@ -45,6 +56,41 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     private static final int CAMERA_PERMISSION_REQUEST = 0x00001;
 
     /**
+     * Default Lower threshold for the canny edge detection process.
+     */
+    private static final int CANNY_LOWER_THRESHOLD = 100;
+
+    /**
+     * Default Upper threshold for the canny edge detection process.
+     */
+    private static final int CANNY_UPPER_THRESHOLD = 800;
+
+    /**
+     * Base path for tesseract storage
+     */
+    private static final String TESS_BASE_BATH = Environment.getExternalStorageDirectory().getAbsolutePath() + "/tesseract/";
+
+    /**
+     * Base path for tesseract models
+     */
+    private static final String TESS_DATA_PATH = TESS_BASE_BATH + "tessdata/";
+
+    /**
+     * The color red in scalar format.
+     */
+    private static final Scalar COLOR_RED = new Scalar(255, 0, 0);
+
+    /**
+     * Tesseract API
+     */
+    TessBaseAPI tessBaseAPI = new TessBaseAPI();
+
+    /**
+     * Deter Engine
+     */
+    PlateDetector detector = new PlateDetector();
+
+    /**
      * Camera Bridge View
      */
     private CameraBridgeViewBase mOpenCvCameraView;
@@ -53,7 +99,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
      * List of permissions required for the camera to be initialised
      */
     private String[] requiredPermissions = new String[] {
-        Manifest.permission.CAMERA
+        Manifest.permission.CAMERA,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.READ_EXTERNAL_STORAGE
     };
 
     /**
@@ -70,9 +118,27 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         }
     };
 
+    /**
+     * Lower SeekBar reference
+     */
+    private SeekBar mLowerThreshSeekBar;
+
+    /**
+     * Upper SeekBar reference
+     */
+    private SeekBar mUpperThreshSeekBar;
+
+    /**
+     * Image frame references
+     */
+    private Mat rgba;
+    private Mat gray;
+
+    /**
+     * Executed when the activity is created.
+     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
 
         // Lock Screen orientation
@@ -88,13 +154,21 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         mOpenCvCameraView = (JavaCamera2View)findViewById(R.id.main_surface);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        // Initialize seek options
+        mLowerThreshSeekBar = findViewById(R.id.lowerThreshold);
+        mUpperThreshSeekBar = findViewById(R.id.upperThreshold);
+
+        // Set the default canny values
+        mLowerThreshSeekBar.setProgress(CANNY_LOWER_THRESHOLD);
+        mUpperThreshSeekBar.setProgress(CANNY_UPPER_THRESHOLD);
+
+        // Initialise tessBaseAPI
+        initialiseTesseract();
     }
 
     /**
      *
-     * @param requestCode
-     * @param permissions
-     * @param grantResults
      */
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -111,6 +185,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         }
     }
 
+    /**
+     *
+     */
     @Override
     public void onPause() {
         super.onPause();
@@ -118,6 +195,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
             mOpenCvCameraView.disableView();
     }
 
+    /**
+     *
+     */
     @Override
     public void onResume() {
         super.onResume();
@@ -130,6 +210,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         }
     }
 
+    /**
+     *
+     */
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -137,117 +220,115 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
             mOpenCvCameraView.disableView();
     }
 
-    @Override
-    public void onCameraViewStarted(int width, int height) {
+    /**
+     *
+     * @param path
+     * @return
+     */
+    private boolean mkdir(String path) {
+        File file = new File(path);
+        if(!file.exists()){
+            return file.mkdirs();
+        }
+
+        return true;
     }
 
+    /**
+     *
+     */
+    private void initialiseTesseract() {
+
+        // Create teh folders if they don't exists
+        mkdir(TESS_BASE_BATH);
+        mkdir(TESS_DATA_PATH);
+
+        // copy the eng lang file from assets folder if not exists.
+        File f2 = new File(TESS_DATA_PATH + "eng.traineddata");
+        if(!f2.exists()){
+            InputStream in = null;
+            try {
+                in = getAssets().open( "tessdata/eng.traineddata");
+                FileOutputStream fout = new FileOutputStream(f2);
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    fout.write(buf, 0, len);
+                }
+                in.close();
+                fout.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        tessBaseAPI.init(TESS_BASE_BATH, "eng", TessBaseAPI.OEM_DEFAULT);
+        tessBaseAPI.setDebug(false);
+        tessBaseAPI.setVariable("tessedit_char_whitelist", " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    }
+
+    /**
+     *
+     * @param width -  the width of the frames that will be delivered
+     * @param height - the height of the frames that will be delivered
+     */
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+        detector.onCameraViewStarted(width, height);
+        rgba = new Mat();
+        gray = new Mat();
+    }
+
+    /**
+     *
+     */
     @Override
     public void onCameraViewStopped() {
     }
 
+    /**
+     *
+     * @param frame
+     * @return
+     */
     @Override
     public Mat onCameraFrame(CvCameraViewFrame frame) {
-        // get current camera frame as OpenCV Mat object
-        Mat gray = frame.gray();
-        Mat rgba = frame.rgba();
+        rgba = frame.rgba();
+        gray = frame.gray();
 
-        // Flip the rgba and gray so they are upright
-        Core.flip(rgba.t(), rgba, 1);
-        Core.flip(gray.t(), gray, 1);
+        // This fixes image rotation, shape really that we have to do this computation on every frame.
+        Core.flip(rgba, rgba, 0);
+        Core.flip(gray, gray, 0);
+        Core.transpose(rgba, rgba);
+        Core.transpose(gray, gray);
 
-        // Perform a canny edge detection process in the gray image.
-        Mat edges = new Mat();
-        Imgproc.Canny(gray, edges, 60, 175);
+        // List of detected plates
+        List<RotatedRect> plates = detector.detect(gray, mLowerThreshSeekBar.getProgress(), mUpperThreshSeekBar.getProgress());
 
-        // Find Contours
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-        Imgproc.findContours(edges, contours, new Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+        // Fetch the largest registration
+        RotatedRect largestPlate = Utils.getLargestContourFromList(plates);
 
-        // Find rectangles
-        List<MatOfPoint> licencePlateContour = detectLicencePlateFromContours(contours);
+        // If we are debugging then show the plate overlay
+        if(largestPlate != null) {
+            Mat cropped = new Mat(gray, largestPlate.boundingRect());
+            Imgproc.threshold(cropped, cropped, 50, 255, Imgproc.THRESH_BINARY);
+            rotateBasedOnRect(cropped, cropped, largestPlate);
 
-//        // Sort the contours by area size
-//        Collections.sort(contours, new Comparator<MatOfPoint>() {
-//            @Override
-//            public int compare(MatOfPoint a, MatOfPoint b) {
-//                // Not sure how expensive this will be computationally as the
-//                // area is computed for each comparison
-//                double areaA = Imgproc.contourArea(a);
-//                double areaB = Imgproc.contourArea(b);
-//
-//                // Change sign depending on whether your want sorted small to big
-//                // or big to small
-//                if (areaA > areaB) {
-//                    return -1;
-//                } else if (areaA < areaB) {
-//                    return 1;
-//                }
-//
-//                return 0;
-//            }
-//        });
+            Bitmap bitmap = Bitmap.createBitmap(cropped.width(), cropped.height(), Bitmap.Config.ARGB_8888);
+            org.opencv.android.Utils.matToBitmap(cropped, bitmap);
+            tessBaseAPI.setImage(bitmap);
 
-//        List<MatOfPoint> topTenContours = contours.subList(0, contours.size() > 10 ? 10 : contours.size());
+            Point[] vertices = new Point[4];
+            largestPlate.points(vertices);
 
-        // Draw contours on the rgba for inspection
-        Imgproc.drawContours(rgba, licencePlateContour, -1, new Scalar(255, 0, 0), 3);
+            Imgproc.putText(rgba, tessBaseAPI.getUTF8Text(), largestPlate.boundingRect().tl(), Imgproc.FONT_HERSHEY_PLAIN, 6, COLOR_RED, 3);
 
-        // return processed frame for live preview
-        return rgba;
-    }
-
-    /// https://github.com/opencv/opencv/blob/master/samples/cpp/squares.cpp
-    private double angle(Point pt1, Point pt2, Point pt0 )
-    {
-        double dx1 = pt1.x - pt0.x;
-        double dy1 = pt1.y - pt0.y;
-        double dx2 = pt2.x - pt0.x;
-        double dy2 = pt2.y - pt0.y;
-        return ( dx1*dx2 + dy1*dy2 ) / Math.sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
-    }
-
-    private List<MatOfPoint> detectLicencePlateFromContours(List<MatOfPoint> contours) {
-
-        List<MatOfPoint> results = new ArrayList<MatOfPoint>();
-        MatOfPoint2f approxCurve = new MatOfPoint2f();
-
-        // Itterate over
-        for(MatOfPoint contour : contours) {
-            MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
-            // Common values for the second parameter to cv2.approxPolyDP  are normally in the
-            // range of 1-5% of the original contour perimeter.
-            Imgproc.approxPolyDP(contour2f, approxCurve, Imgproc.arcLength(contour2f, true) * 0.018, true);
-            Point[] approxCurveArr = approxCurve.toArray();
-            MatOfPoint approxCurveMat = new MatOfPoint(approxCurveArr);
-
-            // If the rectangle doesn't meet the minimum area
-            // The higher this value the large the plate has to be within the vamera view.
-            if(approxCurve.total() == 4 && Math.abs(Imgproc.contourArea(approxCurve)) > 500 && Imgproc.isContourConvex(approxCurveMat)) {
-                double maxCosine = 0;
-                for( int j = 2; j < 5; j++ )
-                {
-                    // Determine Angle
-                    // find the maximum cosine of the angle between joint edges
-                    double cosine = Math.abs(angle(approxCurveArr[j % 4], approxCurveArr[j - 2], approxCurveArr[j - 1]));
-                    maxCosine = Math.max(maxCosine, cosine);
-                }
-
-                // if cosines of all angles are small
-                // (all angles are ~90 degree) then write quandrange
-                // vertices to resultant sequence
-                if( maxCosine < 0.3 )
-                    results.add(approxCurveMat);
-            }
-
-//            // Calculate the bounding rect
-//            Rect boundingRect = Imgproc.boundingRect(approxCurve);
-//            double ratio = boundingRect.width / boundingRect.height;
-//
-//            if(ratio != 3 && ratio != 4) {
-//                continue;
-//            }
+            MatOfPoint contour = new MatOfPoint();
+            Imgproc.drawContours(rgba, Arrays.asList(new MatOfPoint(vertices)), -1, COLOR_RED, 3);
+            cropped.release();
         }
 
-        return results;
+        gray.release();
+        return rgba;
     }
 }
