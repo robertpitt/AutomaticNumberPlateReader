@@ -231,20 +231,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Vie
 
     /**
      *
-     * @param path
-     * @return
-     */
-    private boolean mkdir(String path) {
-        File file = new File(path);
-        if(!file.exists()){
-            return file.mkdirs();
-        }
-
-        return true;
-    }
-
-    /**
-     *
      */
     private void initialiseTesseract() {
 
