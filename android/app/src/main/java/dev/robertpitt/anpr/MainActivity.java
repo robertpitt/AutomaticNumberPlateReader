@@ -3,6 +3,7 @@ package dev.robertpitt.anpr;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Bundle;
@@ -11,8 +12,8 @@ import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.SeekBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
@@ -30,7 +31,6 @@ import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
-import org.opencv.core.Rect;
 import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
@@ -44,7 +44,7 @@ import java.util.List;
 
 import static dev.robertpitt.anpr.Utils.rotateBasedOnRect;
 
-public class MainActivity extends Activity implements CvCameraViewListener2 {
+public class MainActivity extends Activity implements CvCameraViewListener2, View.OnClickListener {
     /**
      * Tag used for debugging
      */
@@ -129,6 +129,11 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     private SeekBar mUpperThreshSeekBar;
 
     /**
+     *
+     */
+    private Button mSettinsButton;
+
+    /**
      * Image frame references
      */
     private Mat rgba;
@@ -162,6 +167,10 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         // Set the default canny values
         mLowerThreshSeekBar.setProgress(CANNY_LOWER_THRESHOLD);
         mUpperThreshSeekBar.setProgress(CANNY_UPPER_THRESHOLD);
+
+        // Settings Button
+        mSettinsButton = findViewById(R.id.settingsButton);
+        mSettinsButton.setOnClickListener(this);
 
         // Initialise tessBaseAPI
         initialiseTesseract();
@@ -262,9 +271,14 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
             }
         }
 
-        tessBaseAPI.init(TESS_BASE_BATH, "eng", TessBaseAPI.OEM_DEFAULT);
+        tessBaseAPI.init(TESS_BASE_BATH, "eng", TessBaseAPI.OEM_LSTM_ONLY);
         tessBaseAPI.setDebug(false);
         tessBaseAPI.setVariable("tessedit_char_whitelist", " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
+        // Disable dictionary lookups as we are not looking
+        // https://tesseract-ocr.github.io/tessdoc/ImproveQuality#dictionaries-word-lists-and-patterns
+        tessBaseAPI.setVariable("load_system_dawg", "false");
+        tessBaseAPI.setVariable("load_freq_dawg", "false");
     }
 
     /**
@@ -306,29 +320,76 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         List<RotatedRect> plates = detector.detect(gray, mLowerThreshSeekBar.getProgress(), mUpperThreshSeekBar.getProgress());
 
         // Fetch the largest registration
-        RotatedRect largestPlate = Utils.getLargestContourFromList(plates);
+        RotatedRect detection = Utils.getLargestContourFromList(plates);
 
-        // If we are debugging then show the plate overlay
-        if(largestPlate != null) {
-            Mat cropped = new Mat(gray, largestPlate.boundingRect());
+        /**
+         * Extract the
+         */
+        if(detection != null) {
+            Mat cropped = new Mat(gray, detection.boundingRect());
+//            Mat cropped = Utils.rotateAndDeskew(gray, detection);
+
+            // Threshold the plate
             Imgproc.threshold(cropped, cropped, 50, 255, Imgproc.THRESH_BINARY);
-            rotateBasedOnRect(cropped, cropped, largestPlate);
 
+            // Output bitmap for OCR
             Bitmap bitmap = Bitmap.createBitmap(cropped.width(), cropped.height(), Bitmap.Config.ARGB_8888);
             org.opencv.android.Utils.matToBitmap(cropped, bitmap);
+
+            // Perform OCR
             tessBaseAPI.setImage(bitmap);
+            String plate = tessBaseAPI.getUTF8Text();
 
             Point[] vertices = new Point[4];
-            largestPlate.points(vertices);
+            detection.points(vertices);
 
-            Imgproc.putText(rgba, tessBaseAPI.getUTF8Text(), largestPlate.boundingRect().tl(), Imgproc.FONT_HERSHEY_PLAIN, 6, COLOR_RED, 3);
-
-            MatOfPoint contour = new MatOfPoint();
+            // Draw Bounding Box
             Imgproc.drawContours(rgba, Arrays.asList(new MatOfPoint(vertices)), -1, COLOR_RED, 3);
-            cropped.release();
+
+            // Write plate and confidence
+            Imgproc.putText(rgba,  detection.angle + " deg - " + plate, detection.boundingRect().tl(), Imgproc.FONT_HERSHEY_PLAIN, 2, COLOR_RED, 2);
         }
+
+//        // If we are debugging then show the plate overlay
+//        if(largestPlate != null) {
+//            Mat cropped = new Mat(gray, largestPlate.boundingRect());
+//
+//            // Fix angle of rotation
+//            double angle = largestPlate.angle < -45. ? largestPlate.angle + 90. : largestPlate.angle;
+//
+//            Point[] vertices = new Point[4];
+//            largestPlate.points(vertices);
+//
+//            // While tesseract version 3.05 (and older) handle inverted image
+//            // (dark background and light text) without problem, for 4.x version use dark
+//            // text on light background.
+//            // THRESH_BINARY == White background + Black Text
+//            Imgproc.threshold(cropped, cropped, 50, 255, Imgproc.THRESH_BINARY);
+//            rotateBasedOnRect(cropped, cropped, largestPlate);
+//
+//            Bitmap bitmap = Bitmap.createBitmap(cropped.width(), cropped.height(), Bitmap.Config.ARGB_8888);
+//            org.opencv.android.Utils.matToBitmap(cropped, bitmap);
+//
+//            // Perform OCR
+//            tessBaseAPI.setImage(bitmap);
+//            String plate = tessBaseAPI.getUTF8Text();
+//
+//            Imgproc.putText(rgba, tessBaseAPI.wordConfidences() + "", largestPlate.boundingRect().tl(), Imgproc.FONT_HERSHEY_PLAIN, 3, COLOR_RED, 3);
+//
+//            MatOfPoint contour = new MatOfPoint();
+//            Imgproc.drawContours(rgba, Arrays.asList(new MatOfPoint(vertices)), -1, COLOR_RED, 3);
+//            cropped.release();
+//        }
 
         gray.release();
         return rgba;
+    }
+
+    @Override
+    public void onClick(View view) {
+        if(view.getId() == R.id.settingsButton) {
+            Intent myIntent = new Intent(this, SettingsActivity.class);
+            this.startActivity(myIntent);
+        }
     }
 }

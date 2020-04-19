@@ -1,16 +1,20 @@
 package dev.robertpitt.anpr;
 
+import android.util.Log;
+
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.RotatedRect;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.Iterator;
 import java.util.List;
 
+import static org.opencv.imgproc.Imgproc.INTER_CUBIC;
 import static org.opencv.imgproc.Imgproc.warpAffine;
 
 public class Utils {
@@ -78,5 +82,33 @@ public class Utils {
     }
 
     return largest;
+  }
+
+  public static Mat rotateAndDeskew(Mat scene, RotatedRect rect) {
+    // Crop the bounding box from the scene.
+    Mat cropped = new Mat(scene, rect.boundingRect());
+
+    // Rotate the cropped scene by the angle.
+    double angle = rect.angle;
+    Size size = rect.size;
+
+    if (angle < -45.) {
+      angle += 90.0;
+    }
+    Log.d("Utils:Angle", rect.angle + " > " + angle);
+
+    // We compute the rotation matrix using the corresponding OpenCV function, we specify the center
+    // of the rotation (the center of our bounding box), the rotation angle (the skew angle) and the
+    // scale factor (none here).
+    Mat rotationMat = Imgproc.getRotationMatrix2D(rect.center, angle, 1);
+
+    // Now that we have the rotation matrix, we can apply the geometric transformation using the function warpAffine
+    Imgproc.warpAffine(cropped, cropped, rotationMat, rect.size, INTER_CUBIC);
+
+    Mat out = new Mat();
+    Imgproc.getRectSubPix(cropped, rect.size, rect.center, cropped);
+
+    cropped.release();
+    return out;
   }
 }

@@ -1,44 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:opencv="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical">
 
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+    <org.opencv.android.JavaCamera2View
+        android:id="@+id/main_surface"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent" />
 
-        <org.opencv.android.JavaCamera2View
-            android:id="@+id/main_surface"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            />
+    <SeekBar
+        android:id="@+id/upperThreshold"
+        style="@android:style/Widget.Material.SeekBar"
+        android:layout_width="380dp"
+        android:layout_height="50dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="100dp"
+        android:layout_marginEnd="5dp"
+        android:layout_marginBottom="5dp"
+        android:max="1000"
+        android:scrollbarSize="10dp" />
 
-        <SeekBar
-            android:id="@+id/upperThreshold"
-            style="@android:style/Widget.SeekBar"
-            android:layout_width="380dp"
-            android:layout_height="50dp"
-            android:layout_marginStart="5dp"
-            android:layout_marginTop="100dp"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="5dp"
-            android:max="1000"
-            android:scrollbarSize="10dp" />
+    <SeekBar
+        android:id="@+id/lowerThreshold"
+        style="@android:style/Widget.Material.SeekBar"
+        android:layout_width="380dp"
+        android:layout_height="50dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="30dp"
+        android:layout_marginEnd="5dp"
+        android:layout_marginBottom="5dp"
+        android:max="1000"
+        android:scrollbarSize="10dp" />
 
-        <SeekBar
-            android:id="@+id/lowerThreshold"
-            style="@android:style/Widget.SeekBar"
-            android:layout_width="380dp"
-            android:layout_height="50dp"
-            android:layout_marginStart="5dp"
-            android:layout_marginTop="30dp"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="5dp"
-            android:max="1000"
-            android:scrollbarSize="10dp" />
+    <Button
+        android:id="@+id/settingsButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:text="@string/settings_button_text" />
 
-    </RelativeLayout>
-
-</LinearLayout>
+</RelativeLayout>
