@@ -214,14 +214,14 @@ public class MainActivity extends AppCompatActivity {
         /**
          * Attach event listener to the view finder to allow touch to focus
          */
-        previewView.setOnTouchListener((view, motionEvent) -> {
-          if (motionEvent.getAction() != MotionEvent.ACTION_UP) {
-            MeteringPoint meteringPoint = previewView.createMeteringPointFactory(cameraSelector).createPoint(motionEvent.getX(), motionEvent.getY());
-            camera.getCameraControl().startFocusAndMetering(new FocusMeteringAction.Builder(meteringPoint).build());
-            return true;
-          }
-          return false;
-        });
+//        previewView.setOnTouchListener((view, motionEvent) -> {
+//          if (motionEvent.getAction() != MotionEvent.ACTION_UP) {
+//            MeteringPoint meteringPoint = previewView.createMeteringPointFactory(cameraSelector).createPoint(motionEvent.getX(), motionEvent.getY());
+//            camera.getCameraControl().startFocusAndMetering(new FocusMeteringAction.Builder(meteringPoint).build());
+//            return true;
+//          }
+//          return false;
+//        });
       } catch (ExecutionException | InterruptedException e) {
         // No errors need to be handled for this Future.
         // This should never be reached.
@@ -255,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Connect the analyzer handler to the analysis pipeline.
      */
-    imageAnalysisUseCase.setAnalyzer(analysisExecutor, image -> this.analyzeFrame(image));
+//    imageAnalysisUseCase.setAnalyzer(analysisExecutor, image -> this.analyzeFrame(image));
 
     /**
      * Return the use case
@@ -296,38 +296,31 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 4. Crop the detection from the greyspace and apply a threshold
      */
-    Mat cropped = singleChannel8BitImage.submat(detection.boundingRect());
+//    Mat cropped = singleChannel8BitImage.submat(detection.boundingRect());
 //    Mat cropped = Utils.rotateAndDeskew(singleChannel8BitImage, detection);
-    Imgproc.threshold(cropped, cropped, 120, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+//    Imgproc.threshold(cropped, cropped, 120, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
 
     /**
      * 5. Convert the cropped mat into a bitmap
      */
-    final Bitmap bitmap = Bitmap.createBitmap(cropped.width(), cropped.height(), Bitmap.Config.ARGB_8888);
-    org.opencv.android.Utils.matToBitmap(cropped, bitmap);
+//    final Bitmap bitmap = Bitmap.createBitmap(cropped.width(), cropped.height(), Bitmap.Config.ARGB_8888);
+//    org.opencv.android.Utils.matToBitmap(cropped, bitmap);
 
     // Perform OCR
-    tessBaseAPI.setImage(bitmap);
-    final String possibleRegistration = tessBaseAPI.getUTF8Text();
-    tessBaseAPI.clear();
+//    tessBaseAPI.setImage(bitmap);
+//    final String possibleRegistration = tessBaseAPI.getUTF8Text();
+//    tessBaseAPI.clear();
 
     /**
      * Update the UI
      */
-    runOnUiThread(() -> {
-      registrationTextView.setText(possibleRegistration);
-      imageOverlayView.setImageBitmap(bitmap);
-      imageOverlayView.setVisibility(View.VISIBLE);
-    });
+//    runOnUiThread(() -> {
+//      registrationTextView.setText(possibleRegistration);
+//      imageOverlayView.setImageBitmap(bitmap);
+//      imageOverlayView.setVisibility(View.VISIBLE);
+//    });
 
     singleChannel8BitImage.release();
     image.close();
-  }
-
-  private void handlePlateDetections(List<MatOfPoint2f> results) {
-//    detectorResultsTextBox.scrollTo(detectorResultsTextBox.getBottom(), 0);
-    for(MatOfPoint2f result : results) {
-
-    }
   }
 }

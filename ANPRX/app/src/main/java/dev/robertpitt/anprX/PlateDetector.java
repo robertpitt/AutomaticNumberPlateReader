@@ -13,6 +13,19 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
+ * Number plate dimensions
+ *
+ * Plate dimensions
+ * Text-Margin = 11mm (top & bottom & left & right)
+ * Text-Group-Spacing = 33mm (space between groups of letters, usually left group and right group)
+ * Character-Height = 79mm
+ * Character-Width = 50mm
+ * Character-Stroke = 14mm
+ * Character-Between-Spacing = 11mm
+ * Character-Margin = 11mm
+ */
+
+/**
  * Algorithm Version 1.
  *
  * 1. Start Video Capture

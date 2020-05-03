@@ -44,10 +44,10 @@ public class ANPRXApplication extends Application implements CameraXConfig.Provi
    */
   @Override
   public void onCreate() {
-    super.onCreate();
     initialiseSentry();
     initialiseTesseract();
     OpenCVLoader.initDebug();
+    super.onCreate();
   }
 
   /**
