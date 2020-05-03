@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "622045513722",
+    "firebase_url": "https://anpr-421a1.firebaseio.com",
+    "project_id": "anpr-421a1",
+    "storage_bucket": "anpr-421a1.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622045513722:android:a30b3985a9815b89960643",
+        "android_client_info": {
+          "package_name": "dev.robertpitt.anpr"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "622045513722-adits1j6g1ta2mrhptucmclvccbb87of.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOFHs8iEKQtugJyin1HISkHULjBYEBKSU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "622045513722-adits1j6g1ta2mrhptucmclvccbb87of.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
