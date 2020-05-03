@@ -23,7 +23,6 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
@@ -33,9 +32,7 @@ import android.widget.Toast;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
-import org.opencv.core.Rect;
 import org.opencv.core.RotatedRect;
 import org.opencv.imgproc.Imgproc;
 
@@ -44,19 +41,25 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+/**
+ * Main Camera Activity
+ */
 public class MainActivity extends AppCompatActivity {
   /**
-   * Log Tag
+   * Log Tag, used to tag logs so we can easily file them using logcat.
    */
   private final static String TAG = "ANPRX::MainActivity";
 
   /**
-   * Camera Permission Message ID
+   * Camera Permission Message ID, this is used for async communication with
+   * the permission requester process, which is spawned if we have missing permissions.
    */
   private final static int CAMERA_PERMISSION_REQUEST = 0x01;
 
   /**
-   *
+   * Static list of permissions this activity requires, this list will
+   * be compared to the actual authorized permissions and if we are missing a
+   * invocation to the android permission layer to prompt the user for those permissions.
    */
   private final static String[] permissions = {
       Manifest.permission.CAMERA,
@@ -64,7 +67,8 @@ public class MainActivity extends AppCompatActivity {
   };
 
   /**
-   * Tesseract API
+   * Tesseract Base API instance, used for processing cropped images
+   * for textual representation
    */
   private TessBaseAPI tessBaseAPI = new TessBaseAPI();
 
@@ -95,7 +99,6 @@ public class MainActivity extends AppCompatActivity {
 
   /**
    * Preview Config
-   *
    * This needs to be initialised after the camera is ready
    */
   private Preview preview;
@@ -158,7 +161,8 @@ public class MainActivity extends AppCompatActivity {
   }
 
   /**
-   *
+   * Handle the result of a permission request, this is the response of the users
+   * interaction with the Allow/Deny dialog.
    */
   @Override
   public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -226,8 +230,9 @@ public class MainActivity extends AppCompatActivity {
   }
 
   /**
-   *
-   * @return
+   * Build the preview user case from the camerax library, this will be used to
+   * display a video feed of the camera on the screen, this preview will be running on
+   * a seperate thread to the numberplate extraction process.
    */
   private Preview buildPreviewUseCase() {
     return new Preview.Builder()
@@ -239,14 +244,12 @@ public class MainActivity extends AppCompatActivity {
    * Create the Image Analysis use case to scan for number plates in the background.
    */
   private ImageAnalysis buildImageAnalysisUseCase() {
-
     /**
      * Create the base configuration
      */
     ImageAnalysis imageAnalysisUseCase = new ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setTargetRotation(Surface.ROTATION_0)
-        .setTargetName("ANPRX")
         .build();
 
     /**
@@ -293,8 +296,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 4. Crop the detection from the greyspace and apply a threshold
      */
-//    Mat cropped = singleChannel8BitImage.submat(detection.boundingRect());
-    Mat cropped = Utils.rotateAndDeskew(singleChannel8BitImage, detection);
+    Mat cropped = singleChannel8BitImage.submat(detection.boundingRect());
+//    Mat cropped = Utils.rotateAndDeskew(singleChannel8BitImage, detection);
     Imgproc.threshold(cropped, cropped, 120, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
 
     /**

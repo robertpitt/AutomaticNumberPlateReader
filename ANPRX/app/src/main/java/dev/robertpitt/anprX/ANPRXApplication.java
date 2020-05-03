@@ -15,6 +15,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import io.sentry.android.core.SentryAndroid;
+import io.sentry.core.SentryLevel;
+
 public class ANPRXApplication extends Application implements CameraXConfig.Provider {
   /**
    * Log Tag
@@ -25,7 +28,6 @@ public class ANPRXApplication extends Application implements CameraXConfig.Provi
    * Base path for tesseract storage
    */
   public static final String TESS_BASE_PATH = Environment.getExternalStorageDirectory().getAbsolutePath() + "/tesseract";
-
 
   /**
    * Override CameraX Config
@@ -38,18 +40,44 @@ public class ANPRXApplication extends Application implements CameraXConfig.Provi
   }
 
   /**
-   *
+   * Initialise the Application
    */
   @Override
   public void onCreate() {
     super.onCreate();
+    initialiseSentry();
     initialiseTesseract();
     OpenCVLoader.initDebug();
   }
 
+  /**
+   * Configure Sentry
+   */
+  private void initialiseSentry() {
+    /**
+     * Manual Initialization of the Sentry Android SDK
+     * @Context - Instance of the Android Context
+     * @Options - Call back function that you need to provide to be able to modify the options.
+     * The call back function is provided with the options loaded from the manifest.
+     */
+    SentryAndroid.init(this, options -> {
+      // Add a callback that will be used before the event is sent to Sentry.
+      // With this callback, you can modify the event or, when returning null, also discard the event.
+      options.setBeforeSend((event, hint) -> {
+        if (SentryLevel.DEBUG.equals(event.getLevel()))
+          return null;
+        else
+          return event;
+      });
+    });
+  }
+
+  /**
+   * Initialise tesseract models and copy them to the SD-Card.
+   */
   private void initialiseTesseract() {
 
-    // Create teh folders if they don't exists
+    // Create the folders if they don't exists
     Utils.mkdir(TESS_BASE_PATH);
     Utils.mkdir(TESS_BASE_PATH + "/tessdata");
 
